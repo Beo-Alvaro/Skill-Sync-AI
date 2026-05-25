@@ -11,18 +11,58 @@ type SearchPanelProps = {
   onComplete?: () => void;
 };
 
+type ManualJobDraft = {
+  title: string;
+  description: string;
+  url: string;
+  budget: string;
+  proposals: string;
+  clientRating: string;
+  postedDate: string;
+  sourceJobId: string;
+};
+
+const defaultManualJob: ManualJobDraft = {
+  title: "Automation expert needed",
+  description: "Build workflows in n8n and Zapier.",
+  url: "upwork.com/jobs/123",
+  budget: "",
+  proposals: "",
+  clientRating: "",
+  postedDate: "",
+  sourceJobId: ""
+};
+
+function normalizeJobUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("www.")) return `https://${trimmed}`;
+  if (trimmed.startsWith("upwork.com") || trimmed.startsWith("/")) {
+    return `https://www.${trimmed.replace(/^\/+/, "")}`;
+  }
+
+  return `https://${trimmed}`;
+}
+
 export function SearchPanel({ onComplete }: SearchPanelProps) {
   const [query, setQuery] = useState("n8n automation");
   const [mode, setMode] = useState<"scrape" | "manual">("scrape");
-  const [importText, setImportText] = useState(`[
-  {
-    "title": "Automation expert needed",
-    "description": "Build workflows in n8n and Zapier.",
-    "url": "https://www.upwork.com/jobs/123"
-  }
-]`);
+  const [manualJobs, setManualJobs] = useState<ManualJobDraft[]>([defaultManualJob]);
   const [message, setMessage] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+
+  function updateManualJob(index: number, patch: Partial<ManualJobDraft>) {
+    setManualJobs((prev) => prev.map((job, jobIndex) => (jobIndex === index ? { ...job, ...patch } : job)));
+  }
+
+  function addManualJob() {
+    setManualJobs((prev) => [...prev, { ...defaultManualJob, title: "", description: "", url: "" }]);
+  }
+
+  function removeManualJob(index: number) {
+    setManualJobs((prev) => prev.filter((_, jobIndex) => jobIndex !== index));
+  }
 
   async function runSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -32,21 +72,32 @@ export function SearchPanel({ onComplete }: SearchPanelProps) {
     let body: Record<string, unknown> = { query };
 
     if (mode === "manual") {
-      try {
-        const parsed = JSON.parse(importText);
-        if (!Array.isArray(parsed)) {
-          throw new Error("Manual import expects a JSON array of jobs.");
-        }
-        body = {
-          mode: "manual",
-          query: query.trim().length ? query : undefined,
-          jobs: parsed
-        };
-      } catch (error) {
+      const missingRequired = manualJobs.some((job) => !job.title.trim() || !job.description.trim());
+      if (missingRequired) {
         setIsSearching(false);
-        setMessage(error instanceof Error ? error.message : "Invalid JSON for manual import.");
+        setMessage("Please provide a title and description for each job.");
         return;
       }
+
+      const jobs = manualJobs.map((job) => {
+        const clientRating = Number(job.clientRating);
+        return {
+          title: job.title.trim(),
+          description: job.description.trim(),
+          url: normalizeJobUrl(job.url),
+          budget: job.budget.trim() || undefined,
+          proposals: job.proposals.trim() || undefined,
+          clientRating: Number.isFinite(clientRating) ? clientRating : undefined,
+          postedDate: job.postedDate.trim() || undefined,
+          sourceJobId: job.sourceJobId.trim() || undefined
+        };
+      });
+
+      body = {
+        mode: "manual",
+        query: query.trim().length ? query : undefined,
+        jobs
+      };
     }
 
     const response = await fetch("/api/searches", {
@@ -71,9 +122,7 @@ export function SearchPanel({ onComplete }: SearchPanelProps) {
     <Card>
       <CardHeader>
         <CardTitle>Job search</CardTitle>
-        <CardDescription>
-          Search Upwork by niche or paste job data to generate match insights.
-        </CardDescription>
+        <CardDescription>Search Upwork by niche or add job details manually.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex gap-2">
@@ -100,12 +149,71 @@ export function SearchPanel({ onComplete }: SearchPanelProps) {
             onChange={(event) => setQuery(event.target.value)}
             placeholder={mode === "manual" ? "Optional label for this import" : "Search query"}
           />
+          {mode === "manual"
+            ? manualJobs.map((job, index) => (
+                <div key={`${job.title}-${index}`} className="rounded-md border border-border p-3">
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      value={job.title}
+                      onChange={(event) => updateManualJob(index, { title: event.target.value })}
+                      placeholder="Job title"
+                    />
+                    <Textarea
+                      value={job.description}
+                      onChange={(event) => updateManualJob(index, { description: event.target.value })}
+                      placeholder="Job description"
+                    />
+                    <Input
+                      value={job.url}
+                      onChange={(event) => updateManualJob(index, { url: event.target.value })}
+                      placeholder="Upwork job URL (paste without https:// to auto-fix)"
+                    />
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Input
+                        value={job.budget}
+                        onChange={(event) => updateManualJob(index, { budget: event.target.value })}
+                        placeholder="Budget"
+                      />
+                      <Input
+                        value={job.proposals}
+                        onChange={(event) => updateManualJob(index, { proposals: event.target.value })}
+                        placeholder="Proposals"
+                      />
+                      <Input
+                        value={job.clientRating}
+                        onChange={(event) => updateManualJob(index, { clientRating: event.target.value })}
+                        placeholder="Client rating (0-5)"
+                      />
+                      <Input
+                        value={job.postedDate}
+                        onChange={(event) => updateManualJob(index, { postedDate: event.target.value })}
+                        placeholder="Posted date"
+                      />
+                      <Input
+                        value={job.sourceJobId}
+                        onChange={(event) => updateManualJob(index, { sourceJobId: event.target.value })}
+                        placeholder="Source job id (optional)"
+                      />
+                    </div>
+                    {manualJobs.length > 1 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => removeManualJob(index)}
+                      >
+                        Remove job
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            : null}
           {mode === "manual" ? (
-            <Textarea
-              className="min-h-40 font-mono text-xs"
-              value={importText}
-              onChange={(event) => setImportText(event.target.value)}
-            />
+            <Button type="button" variant="outline" size="sm" className="self-start" onClick={addManualJob}>
+              Add another job
+            </Button>
           ) : null}
           <Button className="sm:w-40" disabled={isSearching}>
             {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
