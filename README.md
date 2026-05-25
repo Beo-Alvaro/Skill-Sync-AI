@@ -1,19 +1,33 @@
+<div align="center">
+	<img src="assets/skill-sync-ai-logo.png" alt="SkillSync AI logo" width="420" />
+
 # SkillSync AI
 
-AI Upwork Job Matching Assistant for freelancers.
+AI That Finds Work That Fits You
 
-## Stack
+![Next.js](https://img.shields.io/badge/Next.js-App%20Router-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
+![Supabase](https://img.shields.io/badge/Supabase-Auth%20%26%20Postgres-3ECF8E)
+![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-UI-38BDF8)
+![AI](https://img.shields.io/badge/AI-Gemini%20%7C%20OpenAI-7C3AED)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED)
 
-- Next.js App Router
-- TypeScript
-- TailwindCSS with shadcn-style primitives
-- Supabase Auth and PostgreSQL
-- Playwright scraper module
-- Manual job import mode (JSON)
-- Gemini or OpenAI insight enrichment with deterministic fallback
-- Docker-ready build
+[Overview](#overview) • [Features](#features) • [Getting Started](#getting-started) • [Architecture](#architecture) • [Deployment](#deployment) • [Resources](#resources)
+</div>
 
-## Setup
+## Overview
+
+SkillSync AI helps freelancers match with the right jobs faster. It combines a profile-driven scoring engine with optional AI insights to highlight why a job fits, what is missing, and how strong the match is.
+
+## Features
+
+- Profile-based scoring with explainable match insights
+- Manual job import form for compliant data entry
+- AI enrichment (Gemini or OpenAI) with deterministic fallback
+- Search history and match tracking in Supabase
+- Modular services for scraping, scoring, and insights
+
+## Getting Started
 
 1. Copy `.env.example` to `.env.local`.
 2. Fill in Supabase credentials and configure either Gemini or OpenAI for AI insights.
@@ -49,3 +63,14 @@ The codebase is structured as a modular monolith:
 - `utils`: pure helpers, error handling, logging, sanitization, and scoring
 
 The scraper is behind a `JobScraper` interface so it can later move into a dedicated worker or be replaced by a compliant data provider.
+
+## Deployment
+
+- Deploy the Next.js app on Vercel or another Node-compatible platform.
+- Set `SUPABASE_SERVICE_ROLE_KEY` in the deployment environment for server-side writes.
+- Update Supabase Auth redirect URLs to include your production domain.
+
+## Resources
+
+- Supabase project settings and SQL migrations live in [supabase/migrations/001_initial_schema.sql](supabase/migrations/001_initial_schema.sql)
+- Manual import fields accept Upwork links and auto-normalize them to full URLs
