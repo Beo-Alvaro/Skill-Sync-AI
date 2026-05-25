@@ -15,25 +15,45 @@ export class UpworkPlaywrightScraper implements JobScraper {
       const searchUrl = `https://www.upwork.com/nx/search/jobs/?q=${encodeURIComponent(query)}&sort=recency`;
 
       await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => undefined);
       await page.waitForTimeout(2500);
 
+
       const jobs = await page.evaluate((maxJobs) => {
-        const cards = Array.from(
-          document.querySelectorAll("[data-test='job-tile'], article, section")
-        ).slice(0, maxJobs * 2);
+        const normalize = (value: string | null | undefined) =>
+          (value ?? "").replace(/\s+/g, " ").trim();
+
+        const linkedCards = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href*='/jobs/']"))
+          .map((link) => {
+            const card =
+              link.closest("[data-test='job-tile']") ??
+              link.closest("article") ??
+              link.closest("section") ??
+              link.closest("div");
+
+            return card ? { card, link } : null;
+          })
+          .filter((item): item is { card: Element; link: HTMLAnchorElement } => Boolean(item));
+
+        const seen = new Set<string>();
+        const cards = linkedCards.filter(({ link }) => {
+          const key = link.href || link.innerText;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
 
         return cards
           .map((card) => {
-            const link = card.querySelector<HTMLAnchorElement>("a[href*='/jobs/']");
+            const text = normalize((card.card as HTMLElement).innerText);
             const title =
-              card.querySelector<HTMLElement>("[data-test='job-tile-title']")?.innerText ??
-              link?.innerText ??
-              "";
+              normalize(card.card.querySelector<HTMLElement>("[data-test='job-tile-title']")?.innerText) ||
+              normalize(card.card.querySelector<HTMLElement>("h2, h3, h4")?.innerText) ||
+              normalize(card.link.innerText);
             const description =
-              card.querySelector<HTMLElement>("[data-test='job-description-text']")?.innerText ??
-              card.querySelector<HTMLElement>("p")?.innerText ??
-              "";
-            const text = (card as HTMLElement).innerText ?? "";
+              normalize(card.card.querySelector<HTMLElement>("[data-test='job-description-text']")?.innerText) ||
+              normalize(card.card.querySelector<HTMLElement>("p")?.innerText) ||
+              text.replace(title, "").trim();
             const budget = text.match(/(\$[\d,.]+(?:\s*-\s*\$[\d,.]+)?|Hourly|Fixed-price)/i)?.[0] ?? null;
             const proposals = text.match(/(?:Less than|[\d+]+\s*to\s*[\d+]+|[\d+]+)\s+proposals?/i)?.[0] ?? null;
             const rating = text.match(/(\d(?:\.\d)?)\s+of\s+5/i)?.[1] ?? null;
@@ -49,14 +69,23 @@ export class UpworkPlaywrightScraper implements JobScraper {
               proposals,
               clientRating: rating ? Number(rating) : null,
               postedDate,
-              url: link?.href ?? null,
-              sourceJobId: link?.href?.split("/").filter(Boolean).pop() ?? null,
+              url: card.link.href ?? null,
+              sourceJobId: card.link.href?.split("/").filter(Boolean).pop() ?? null,
               rawPayload: { text }
             };
           })
-          .filter((job) => job.title.length > 0 && job.description.length > 0)
+          .filter((job) => job.title.length > 0 && job.url)
           .slice(0, maxJobs);
       }, limit);
+
+      if (jobs.length === 0) {
+        logger.warn("Upwork scraper returned no jobs", {
+          query,
+          pageUrl: page.url(),
+          title: await page.title(),
+          bodyPreview: (await page.locator("body").innerText().catch(() => "")).slice(0, 500)
+        });
+      }
 
       return jobs.map((job) => ({
         source: "upwork",

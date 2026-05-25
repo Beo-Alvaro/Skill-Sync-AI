@@ -1,6 +1,6 @@
 export type ScrapedJob = {
   id?: string;
-  source: "upwork";
+  source: "upwork" | "manual";
   sourceJobId?: string | null;
   url?: string | null;
   title: string;

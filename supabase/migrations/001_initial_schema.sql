@@ -106,6 +106,17 @@ create trigger on_auth_user_created
   after insert or update on auth.users
   for each row execute procedure public.handle_new_user();
 
+insert into public.users (id, email, full_name)
+select
+  auth.users.id,
+  auth.users.email,
+  auth.users.raw_user_meta_data ->> 'full_name'
+from auth.users
+on conflict (id) do update set
+  email = excluded.email,
+  full_name = excluded.full_name,
+  updated_at = now();
+
 alter table public.users enable row level security;
 alter table public.freelancer_profiles enable row level security;
 alter table public.profile_skills enable row level security;
@@ -208,3 +219,17 @@ create policy "Users manage own matches"
   on public.job_matches for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+grant all on all routines in schema public to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+
+alter default privileges in schema public
+  grant all on routines to anon, authenticated, service_role;

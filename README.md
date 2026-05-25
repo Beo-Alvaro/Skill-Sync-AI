@@ -9,16 +9,32 @@ AI Upwork Job Matching Assistant for freelancers.
 - TailwindCSS with shadcn-style primitives
 - Supabase Auth and PostgreSQL
 - Playwright scraper module
-- OpenAI insight enrichment with deterministic fallback
+- Manual job import mode (JSON)
+- Gemini or OpenAI insight enrichment with deterministic fallback
 - Docker-ready build
 
 ## Setup
 
 1. Copy `.env.example` to `.env.local`.
-2. Fill in Supabase credentials and optionally `OPENAI_API_KEY`.
+2. Fill in Supabase credentials and configure either Gemini or OpenAI for AI insights.
 3. Apply `supabase/migrations/001_initial_schema.sql` in Supabase SQL editor or through Supabase CLI.
 4. Install dependencies with `npm install`.
 5. Run the app with `npm run dev`.
+
+For Gemini:
+
+```env
+AI_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_key
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+For OpenAI:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=your_openai_key
+```
 
 ## Architecture
 

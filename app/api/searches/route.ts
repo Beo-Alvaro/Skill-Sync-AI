@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     const db = await createSupabaseServerClient();
     const service = new SearchService(db);
     const body = await request.json();
-    const result = await service.runSearch(user.id, body);
+    const result = body?.mode === "manual"
+      ? await service.runManualSearch(user.id, body)
+      : await service.runSearch(user.id, body);
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

@@ -11,6 +11,10 @@ export class AppError extends Error {
   }
 }
 
+function isSupabaseError(error: unknown): error is { code?: string; message: string; details?: unknown } {
+  return Boolean(error && typeof error === "object" && "message" in error);
+}
+
 export function handleApiError(error: unknown) {
   if (error instanceof ZodError) {
     return NextResponse.json(
@@ -23,6 +27,20 @@ export function handleApiError(error: unknown) {
     return NextResponse.json(
       { error: error.message, details: error.details },
       { status: error.statusCode }
+    );
+  }
+
+  if (isSupabaseError(error)) {
+    console.error("[api:error]", error);
+    return NextResponse.json(
+      {
+        error: error.message,
+        details: {
+          code: error.code,
+          details: error.details
+        }
+      },
+      { status: 500 }
     );
   }
 

@@ -3,7 +3,7 @@ import type { ScrapedJob } from "@/types/job";
 
 type JobRow = {
   id: string;
-  source: "upwork";
+  source: "upwork" | "manual";
   source_job_id: string | null;
   url: string | null;
   title: string;
