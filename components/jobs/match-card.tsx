@@ -9,7 +9,7 @@ export function MatchCard({ match }: { match: JobMatch }) {
   return (
     <Card>
       <CardContent className="pt-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_140px] md:items-start">
           <div className="min-w-0 space-y-3">
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -41,7 +41,7 @@ export function MatchCard({ match }: { match: JobMatch }) {
               </p>
             ) : null}
           </div>
-          <div className="flex min-w-28 flex-col items-start rounded-md border bg-secondary px-4 py-3 md:items-center">
+          <div className="flex w-full flex-col items-center rounded-md border bg-secondary px-4 py-3 text-center md:justify-self-end">
             <span className="text-2xl font-semibold text-primary">{match.matchPercentage}%</span>
             <span className="text-xs text-muted-foreground">{match.estimatedFit}</span>
           </div>
