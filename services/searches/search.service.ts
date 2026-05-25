@@ -27,12 +27,13 @@ export class SearchService {
 
   constructor(
     db: SupabaseClient,
-    private readonly scraper: JobScraper = new UpworkPlaywrightScraper()
+    private readonly scraper: JobScraper = new UpworkPlaywrightScraper(),
+    adminDb?: SupabaseClient
   ) {
     this.searches = new SearchRepository(db);
     this.profiles = new ProfileRepository(db);
-    this.jobs = new JobRepository(db);
-    this.matches = new MatchRepository(db);
+    this.jobs = new JobRepository(adminDb ?? db);
+    this.matches = new MatchRepository(adminDb ?? db);
   }
 
   async runSearch(userId: string, input: unknown): Promise<{ search: Search; matches: JobMatch[] }> {

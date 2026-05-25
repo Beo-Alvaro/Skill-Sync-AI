@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireCurrentUser } from "@/services/auth/auth.service";
 import { SearchService } from "@/services/searches/search.service";
@@ -10,7 +11,15 @@ export async function GET() {
   try {
     const user = await requireCurrentUser();
     const db = await createSupabaseServerClient();
-    const service = new SearchService(db);
+    let adminDb;
+
+    try {
+      adminDb = createSupabaseAdminClient();
+    } catch {
+      adminDb = undefined;
+    }
+
+    const service = new SearchService(db, undefined, adminDb);
     const searches = await service.listSearches(user.id);
 
     return NextResponse.json({ data: searches });
@@ -23,7 +32,15 @@ export async function POST(request: Request) {
   try {
     const user = await requireCurrentUser();
     const db = await createSupabaseServerClient();
-    const service = new SearchService(db);
+    let adminDb;
+
+    try {
+      adminDb = createSupabaseAdminClient();
+    } catch {
+      adminDb = undefined;
+    }
+
+    const service = new SearchService(db, undefined, adminDb);
     const body = await request.json();
     const result = body?.mode === "manual"
       ? await service.runManualSearch(user.id, body)
