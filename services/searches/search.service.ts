@@ -1,0 +1,79 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSearchSchema } from "@/lib/validation/search.schema";
+import { JobRepository } from "@/repositories/job.repository";
+import { MatchRepository } from "@/repositories/match.repository";
+import { ProfileRepository } from "@/repositories/profile.repository";
+import { SearchRepository } from "@/repositories/search.repository";
+import { AiInsightService } from "@/services/insights/ai-insight.service";
+import { MatchingService } from "@/services/matching/matching.service";
+import { RateLimitService } from "@/services/rate-limit/rate-limit.service";
+import type { JobScraper } from "@/services/scraper/scraper.types";
+import { UpworkPlaywrightScraper } from "@/services/scraper/upwork-scraper.service";
+import type { JobMatch } from "@/types/match";
+import type { Search } from "@/types/search";
+import { AppError } from "@/utils/errors";
+import { sanitizeText } from "@/utils/sanitize";
+
+const rateLimiter = new RateLimitService(5, 10 * 60 * 1000);
+
+export class SearchService {
+  private readonly searches: SearchRepository;
+  private readonly profiles: ProfileRepository;
+  private readonly jobs: JobRepository;
+  private readonly matches: MatchRepository;
+  private readonly matcher = new MatchingService();
+  private readonly insights = new AiInsightService();
+
+  constructor(
+    db: SupabaseClient,
+    private readonly scraper: JobScraper = new UpworkPlaywrightScraper()
+  ) {
+    this.searches = new SearchRepository(db);
+    this.profiles = new ProfileRepository(db);
+    this.jobs = new JobRepository(db);
+    this.matches = new MatchRepository(db);
+  }
+
+  async runSearch(userId: string, input: unknown): Promise<{ search: Search; matches: JobMatch[] }> {
+    rateLimiter.assertAllowed(userId);
+
+    const parsed = createSearchSchema.parse(input);
+    const query = sanitizeText(parsed.query);
+    const profile = await this.profiles.findByUserId(userId);
+
+    if (!profile) {
+      throw new AppError("Create your freelancer profile before searching for jobs.", 409);
+    }
+
+    const search = await this.searches.create(userId, query);
+    await this.searches.updateStatus(search.id, "running");
+
+    try {
+      const scrapedJobs = await this.scraper.searchJobs({ query, limit: 10 });
+      const storedJobs = await this.jobs.upsertMany(scrapedJobs);
+      const deterministicMatches = this.matcher.scoreJobs({
+        userId,
+        searchId: search.id,
+        profile,
+        jobs: storedJobs
+      });
+      const enrichedMatches = await this.insights.enrichMatches(profile, deterministicMatches);
+      const savedMatches = await this.matches.createMany(enrichedMatches);
+
+      await this.searches.updateStatus(search.id, "completed");
+
+      return {
+        search: { ...search, status: "completed", completedAt: new Date().toISOString() },
+        matches: savedMatches
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Search failed";
+      await this.searches.updateStatus(search.id, "failed", message);
+      throw error;
+    }
+  }
+
+  async listSearches(userId: string): Promise<Search[]> {
+    return this.searches.listByUser(userId);
+  }
+}
