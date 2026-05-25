@@ -14,13 +14,13 @@ type SearchPanelProps = {
 export function SearchPanel({ onComplete }: SearchPanelProps) {
   const [query, setQuery] = useState("n8n automation");
   const [mode, setMode] = useState<"scrape" | "manual">("scrape");
-  const [importText, setImportText] = useState("[
+  const [importText, setImportText] = useState(`[
   {
-    \"title\": \"Automation expert needed\",
-    \"description\": \"Build workflows in n8n and Zapier.\",
-    \"url\": \"https://www.upwork.com/jobs/123\"
+    "title": "Automation expert needed",
+    "description": "Build workflows in n8n and Zapier.",
+    "url": "https://www.upwork.com/jobs/123"
   }
-]");
+]`);
   const [message, setMessage] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
